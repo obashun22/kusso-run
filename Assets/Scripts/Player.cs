@@ -18,11 +18,6 @@ public class Player : MonoBehaviour
     {
         switch (_gameManager.GetComponent<GameManager>().gameState)
         {
-            case GameState.Ready:
-                if (Input.GetKey(KeyCode.Space)) {
-                    _animator.SetTrigger("Start");
-                }
-                break;
             case GameState.Play:
                 if (Input.GetKey(KeyCode.A)) {
                     if (!_animator.IsInTransition(0)) {
@@ -56,7 +51,13 @@ public class Player : MonoBehaviour
             _animator.SetTrigger("Death");
         } else if (other.gameObject.tag == "Coin") {
             Debug.Log("Coin!!!");
+            _gameManager.GetComponent<GameManager>().ScoreUp(other.gameObject.GetComponent<Item>().score);
             other.gameObject.GetComponent<Item>().DestroyWithAction();
         }
+    }
+
+    public void StartRunning()
+    {
+        _animator.SetTrigger("Start");
     }
 }

@@ -11,7 +11,7 @@ public class Rolling : MonoBehaviour
     }
 
     // Update is called once per frame
-    void Update()
+    void FixedUpdate()
     {
         this.gameObject.transform.RotateAround(this.gameObject.transform.position, Vector3.right, -UnityEngine.Random.Range(5f, 15f));
         this.gameObject.transform.position += new Vector3(0, 0, -0.1f);

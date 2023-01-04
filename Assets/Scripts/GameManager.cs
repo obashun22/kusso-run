@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using TMPro;
 
 public class GameManager : MonoBehaviour
 {
@@ -10,9 +11,14 @@ public class GameManager : MonoBehaviour
     [SerializeField] int _maxUnitCount;
     [SerializeField] int _minUnitCount;
     [SerializeField] float _speedUpRate;
+    static public GameState? initialGameState;
     public GameState gameState;
+    [SerializeField] GameObject _player;
     [SerializeField] GameObject[] _obstacles;
     [SerializeField] GameObject[] _obstaclesM;
+    [SerializeField] GameObject[] _raresS;
+    [SerializeField] GameObject[] _raresA;
+    [SerializeField] GameObject[] _raresB;
     [SerializeField] GameObject[] _envObjects;
     [SerializeField] GameObject[] _sponers;
     [SerializeField] GameObject _envSponerL;
@@ -22,6 +28,12 @@ public class GameManager : MonoBehaviour
     [SerializeField] GameObject _ground;
     [SerializeField] float _groundDiff;
     [SerializeField] GameObject _coin;
+    [SerializeField] TextMeshProUGUI _scoreText;
+    [SerializeField] GameObject _homeUI;
+    [SerializeField] GameObject _playUI;
+    [SerializeField] GameObject _stopUI;
+    [SerializeField] GameObject _gameOverUI;
+    [SerializeField] GameObject _newItemUI;
 
     private float _envSponIntervalL;
     private float _envSponIntervalR;
@@ -32,6 +44,7 @@ public class GameManager : MonoBehaviour
     private int _unitCount;
     private int _sponUnitCount;
     private int _coinLine;
+    private int _score;
 
     // Start is called before the first frame update
     void Start()
@@ -40,15 +53,22 @@ public class GameManager : MonoBehaviour
         _envSponIntervalR = 0f;
         _sponUnitCount = 0;
         _coinLine = UnityEngine.Random.Range(0, 3);
+        _score = 0;
+        if (GameManager.initialGameState == null) {
+            SetGameState(GameState.Ready);
+        } else if (GameManager.initialGameState == GameState.Play) {
+            SetGameState(GameState.Play);
+            GameManager.initialGameState = null;
+        }
     }
 
     // Update is called once per frame
-    void Update()
+    void FixedUpdate()
     {
         switch (gameState) {
             case GameState.Ready:
                 if (Input.GetKey(KeyCode.Space)) {
-                    SetGameState(GameState.Play);
+                    StartGame();
                 }
                 break;
             case GameState.Play:
@@ -56,6 +76,7 @@ public class GameManager : MonoBehaviour
                 envTimeL += Time.deltaTime;
                 envTimeR += Time.deltaTime;
                 diff += speed * Time.deltaTime;
+                _scoreText.text = _score.ToString("D8");
 
                 // 生成処理
                 if (time > _unitInterval) {
@@ -76,8 +97,24 @@ public class GameManager : MonoBehaviour
 
                         _coinLine = UnityEngine.Random.Range(0, 3);
                     } else {
-                        GameObject coin = Instantiate(_coin, _sponers[_coinLine].transform.position, Quaternion.identity);
-                        coin.transform.parent = _field.transform;
+                        float rand = UnityEngine.Random.Range(0f, 1f);
+                        if (rand < 0.00001) {
+                            // 超レアアイテム
+                            GameObject obj = Instantiate(_raresS[UnityEngine.Random.Range(0, _raresS.Length)], _sponers[_coinLine].transform.position, Quaternion.identity);
+                            obj.transform.parent = _field.transform;
+                        } else if (rand < 0.0001) {
+                            // 結構レアアイテム
+                            GameObject obj = Instantiate(_raresA[UnityEngine.Random.Range(0, _raresA.Length)], _sponers[_coinLine].transform.position, Quaternion.identity);
+                            obj.transform.parent = _field.transform;
+                        } else if (rand < 0.001) {
+                            // 普通のレアアイテム
+                            GameObject obj = Instantiate(_raresB[UnityEngine.Random.Range(0, _raresB.Length)], _sponers[_coinLine].transform.position, Quaternion.identity);
+                            obj.transform.parent = _field.transform;
+                        } else {
+                            // 普通のコイン
+                            GameObject coin = Instantiate(_coin, _sponers[_coinLine].transform.position, Quaternion.identity);
+                            coin.transform.parent = _field.transform;
+                        }
                     }
                 }
                 if (envTimeL > _envSponIntervalL) {
@@ -102,10 +139,14 @@ public class GameManager : MonoBehaviour
                     ground.transform.parent = _field.transform;
                 }
                 break;
+            case GameState.Stop:
+                break;
             case GameState.GameOver:
                 if (Input.GetKey(KeyCode.Space)) {
-                    Scene loadScene = SceneManager.GetActiveScene();
-                    SceneManager.LoadScene(loadScene.name);
+                    ReloadGame();
+                }
+                if (Input.GetKey(KeyCode.R)) {
+                    RestartGame();
                 }
                 break;
         }
@@ -115,5 +156,87 @@ public class GameManager : MonoBehaviour
     {
         gameState = state;
         Debug.Log("SetState: " + state);
+        GameStateDidChange(state);
+    }
+
+    private void GameStateDidChange(GameState state)
+    {
+        switch (state)
+        {
+            case GameState.Ready:
+                _homeUI.SetActive(true);
+                _playUI.SetActive(false);
+                _stopUI.SetActive(false);
+                _gameOverUI.SetActive(false);
+                _newItemUI.SetActive(false);
+                Time.timeScale = 1;
+                break;
+            case GameState.Play:
+                _homeUI.SetActive(false);
+                _playUI.SetActive(true);
+                _stopUI.SetActive(false);
+                _gameOverUI.SetActive(false);
+                Time.timeScale = 1;
+                _player.GetComponent<Player>().StartRunning();
+                break;
+            case GameState.Stop:
+                _homeUI.SetActive(false);
+                _playUI.SetActive(true);
+                _stopUI.SetActive(true);
+                _gameOverUI.SetActive(false);
+                Time.timeScale = 0;
+                break;
+            case GameState.GameOver:
+                _homeUI.SetActive(false);
+                _playUI.SetActive(false);
+                _stopUI.SetActive(false);
+                _gameOverUI.SetActive(true);
+                Time.timeScale = 1;
+                break;
+        }
+    }
+
+    public void ScoreUp(int score)
+    {
+        _score += score;
+        Debug.Log("ScoreUp: " + _score);
+    }
+
+    public void StopGame()
+    {
+        Debug.Log("StopGame");
+        SetGameState(GameState.Stop);
+    }
+
+    public void ContinueGame()
+    {
+        Debug.Log("ContinueGame");
+        SetGameState(GameState.Play);
+    }
+
+    public void ReloadGame()
+    {
+        Debug.Log("ReloadGame");
+        Scene loadScene = SceneManager.GetActiveScene();
+        SceneManager.LoadScene(loadScene.name);
+    }
+
+    public void RestartGame()
+    {
+        GameManager.initialGameState = GameState.Play;
+        Scene loadScene = SceneManager.GetActiveScene();
+        SceneManager.LoadScene(loadScene.name);
+    }
+
+    public void StartGame()
+    {
+        Debug.Log("StartGame");
+        SetGameState(GameState.Play);
+    }
+
+    public void GameOver()
+    {
+        Debug.Log("GameOver");
+        SetGameState(GameState.GameOver);
     }
 }
